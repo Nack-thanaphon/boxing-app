@@ -54,8 +54,8 @@ export class PaymentsService {
           throw new Error('Card details are incomplete for tokenization');
         }
 
-        // Check if we're in mock mode (disabled for real Omise testing)
-        const isMockMode = false;
+        // Check if we're in mock mode (enabled for testing)
+        const isMockMode = true;
 
         if (isMockMode) {
           console.log('🔧 MOCK MODE: Creating mock card token');
@@ -100,8 +100,8 @@ export class PaymentsService {
 
       let omiseSourceType: string;
 
-      // MOCK PAYMENT FOR TESTING - DISABLED FOR REAL OMISE TESTING
-      const isMockMode = false;
+      // MOCK PAYMENT FOR TESTING - ENABLED FOR TESTING
+      const isMockMode = true;
 
 
       if (isMockMode) {

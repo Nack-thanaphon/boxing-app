@@ -1,0 +1,14 @@
+FROM alpine:latest
+
+# Install curl and bash
+RUN apk add --no-cache curl bash
+
+# Copy cleanup script
+COPY scripts/cleanup-expired-payments.sh /usr/local/bin/cleanup-expired-payments.sh
+RUN chmod +x /usr/local/bin/cleanup-expired-payments.sh
+
+# Create crontab entry
+RUN echo "*/5 * * * * /usr/local/bin/cleanup-expired-payments.sh >> /var/log/cleanup.log 2>&1" | crontab -
+
+# Start cron daemon
+CMD ["crond", "-f", "-l", "2"]

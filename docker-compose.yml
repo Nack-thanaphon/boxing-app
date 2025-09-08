@@ -19,40 +19,40 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend Service (Express.js)
-  backend:
-    build:
-      context: ./application/muay-thai-ticket-backend
-      dockerfile: Dockerfile.dev
-    container_name: boxing-app-backend
-    restart: unless-stopped
-    ports:
-      - "3002:3002"
-    environment:
-      NODE_ENV: development
-      PORT: 3002
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USERNAME: postgres
-      DB_PASSWORD: password
-      DB_NAME: boxing_app_dev
-      JWT_SECRET: dev-jwt-secret-key
-      JWT_EXPIRES_IN: 7d
-      CORS_ORIGIN: http://localhost:3001,http://localhost:3000,http://localhost:3002
-      PAYMENT_SERVICE_URL: http://payment-service:3000
-    volumes:
-      - ./application/muay-thai-ticket-backend:/app
-      - /app/node_modules
-      - ./application/muay-thai-ticket-backend/logs:/app/logs
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+  # Backend Service (Express.js) - DISABLED FOR TESTING
+  # backend:
+  #   build:
+  #     context: ./application/muay-thai-ticket-backend
+  #     dockerfile: Dockerfile.dev
+  #   container_name: boxing-app-backend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3002:3002"
+  #   environment:
+  #     NODE_ENV: development
+  #     PORT: 3002
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_USERNAME: postgres
+  #     DB_PASSWORD: password
+  #     DB_NAME: boxing_app_dev
+  #     JWT_SECRET: dev-jwt-secret-key
+  #     JWT_EXPIRES_IN: 7d
+  #     CORS_ORIGIN: http://localhost:3001,http://localhost:3000,http://localhost:3002
+  #     PAYMENT_SERVICE_URL: http://payment-service:3000
+  #   volumes:
+  #     - ./application/muay-thai-ticket-backend:/app
+  #     - /app/node_modules
+  #     - ./application/muay-thai-ticket-backend/logs:/app/logs
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
 
   # Payment Service API (NestJS)
   payment-service:
@@ -70,7 +70,7 @@ services:
       DB_PORT: 5432
       DB_USERNAME: postgres
       DB_PASSWORD: password
-      DB_NAME: payment_service_dev
+      DB_NAME: postgres
       OMISE_PUBLIC_KEY: pkey_test_64u883evuqm272sxgil
       OMISE_SECRET_KEY: skey_test_64z8829g9n0tva7hyfa
       OMISE_WEBHOOK_SECRET: whsec_test_64z8829g9n0tva7hyfa
@@ -110,7 +110,6 @@ services:
       - /app/node_modules
       - /app/.next
     depends_on:
-      - backend
       - payment-service
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3001 || exit 1"]
@@ -118,6 +117,18 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # Cron Job Service
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
+    container_name: boxing-app-cron
+    restart: unless-stopped
+    depends_on:
+      - payment-service
+    volumes:
+      - ./logs:/var/log
 
 volumes:
   postgres_data:

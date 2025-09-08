@@ -7,6 +7,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { SeatsModule } from './seats/seats.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { LoggerModule } from './common/logger/logger.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 import { Payment } from './database/entities/payment.entity';
 import { PaymentLog } from './database/entities/payment-log.entity';
 import { Seat } from './database/entities/seat.entity';
@@ -34,8 +35,9 @@ import { Seat } from './database/entities/seat.entity';
     SeatsModule,
     WebhookModule,
     LoggerModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
