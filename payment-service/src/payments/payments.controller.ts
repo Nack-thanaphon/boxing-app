@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentResponse } from './payments.service';
@@ -10,7 +10,30 @@ export class PaymentsController {
 
   @Post('create')
   async createPayment(@Body() createPaymentDto: CreatePaymentDto): Promise<PaymentResponse> {
-    return this.paymentsService.createPayment(createPaymentDto);
+    try {
+      return await this.paymentsService.createPayment(createPaymentDto);
+    } catch (error) {
+      console.error('Controller error:', error);
+
+      // Determine appropriate HTTP status code
+      let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+      if (error.code === 'SEAT_NOT_FOUND' || error.code === 'SEAT_NOT_AVAILABLE' || error.code === 'INVALID_SEAT_ID') {
+        statusCode = HttpStatus.BAD_REQUEST;
+      } else if (error.code === 'PAYMENT_SERVICE_UNAVAILABLE') {
+        statusCode = HttpStatus.SERVICE_UNAVAILABLE;
+      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.code === 'CARD_DECLINED') {
+        statusCode = HttpStatus.PAYMENT_REQUIRED;
+      }
+
+      throw new HttpException(
+        {
+          message: error.message || 'เกิดข้อผิดพลาดในการสร้างการชำระเงิน',
+          code: error.code || 'PAYMENT_CREATION_FAILED',
+          details: error.originalError || null,
+        },
+        statusCode
+      );
+    }
   }
 
   @Get('methods')

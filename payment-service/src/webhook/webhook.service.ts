@@ -55,6 +55,32 @@ export class WebhookService {
       let newStatus: PaymentStatus;
 
       switch (eventType) {
+        case 'charge.create': // Handle initial charge creation
+          // Omise sends the current status of the charge when it's created
+          switch (charge.status) {
+            case 'successful':
+              newStatus = PaymentStatus.PAID;
+              break;
+            case 'failed':
+              newStatus = PaymentStatus.FAILED;
+              break;
+            case 'pending':
+              newStatus = PaymentStatus.PENDING;
+              break;
+            default:
+              // If we get an unexpected status on charge.create, log and ignore for now
+              await this.loggerService.logPayment(
+                'warn',
+                `Unhandled charge.create status: ${charge.status}`,
+                { event: body, chargeStatus: charge.status },
+                null,
+                charge.id,
+                'webhook_unhandled_create_status',
+                eventType,
+              );
+              return { status: 'ignored' };
+          }
+          break; // Don't forget to break after handling charge.create
         case 'charge.complete':
           newStatus = PaymentStatus.PAID;
           break;

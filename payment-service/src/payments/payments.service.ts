@@ -11,6 +11,7 @@ import { LoggerService } from '../common/logger/logger.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentMethodsResponse, PaymentMethodDto } from './dto/payment-method.dto';
 import * as omise from 'omise';
+import { ErrorMapper } from '../common/errors/error.mapper';
 
 @Injectable()
 export class PaymentsService {
@@ -54,23 +55,29 @@ export class PaymentsService {
           throw new Error('Card details are incomplete for tokenization');
         }
 
-        // Check if we're in mock mode (enabled for testing)
-        const isMockMode = true;
+        // Check if we're in mock mode (disabled for real Omise testing)
+        const isMockMode = false;
 
         if (isMockMode) {
           console.log('🔧 MOCK MODE: Creating mock card token');
           tokenToUse = `mock_token_${Date.now()}`;
         } else {
-          const omiseToken = await this.omiseClient.tokens.create({
-            card: {
-              number: card_number,
-              name: card_name,
-              expiration_month,
-              expiration_year,
-              security_code,
-            },
-          });
-          tokenToUse = omiseToken.id;
+          try {
+            const omiseToken = await this.omiseClient.tokens.create({
+              card: {
+                number: card_number,
+                name: card_name,
+                expiration_month,
+                expiration_year,
+                security_code,
+              },
+            });
+            tokenToUse = omiseToken.id;
+            console.log('✅ Card token created successfully:', tokenToUse);
+          } catch (tokenError) {
+            console.error('❌ Card tokenization failed:', tokenError);
+            throw new Error(`Card tokenization failed: ${tokenError.message || tokenError}`);
+          }
         }
       }
 
@@ -78,7 +85,6 @@ export class PaymentsService {
       let seat = null;
       if (seat_id) {
         seat = await this.seatRepository.findOne({ where: { id: seat_id } });
-        console.log('Seat:', seat);
         if (!seat) {
           throw new NotFoundException('Seat not found');
         }
@@ -100,8 +106,8 @@ export class PaymentsService {
 
       let omiseSourceType: string;
 
-      // MOCK PAYMENT FOR TESTING - ENABLED FOR TESTING
-      const isMockMode = true;
+      // MOCK PAYMENT FOR TESTING - DISABLED FOR REAL OMISE TESTING
+      const isMockMode = false;
 
 
       if (isMockMode) {
@@ -155,37 +161,50 @@ export class PaymentsService {
             if (!tokenToUse) {
               throw new Error('Card token is required for card payments');
             }
-            charge = await this.omiseClient.charges.create({
-              amount: omiseAmount,
-              currency: omiseCurrency,
-              card: tokenToUse,
-              description: omiseDescription,
-              metadata: omiseMetadata,
-            });
+            try {
+              charge = await this.omiseClient.charges.create({
+                amount: omiseAmount,
+                currency: omiseCurrency,
+                card: tokenToUse,
+                description: omiseDescription,
+                metadata: omiseMetadata,
+              });
+              console.log('✅ Card charge created successfully:', charge.id);
+            } catch (chargeError) {
+              console.error('❌ Card charge creation failed:', chargeError);
+              throw new Error(`Card charge creation failed: ${chargeError.message || chargeError}`);
+            }
             break;
           case PaymentMethod.PROMPT_PAY:
             omiseSourceType = 'promptpay';
             break;
           case PaymentMethod.TRUE_MONEY:
+            // Use supported TrueMoney type
             omiseSourceType = 'truemoney';
             break;
           case PaymentMethod.WECHAT_PAY:
-            omiseSourceType = 'wechat';
+            // WeChat Pay requires special activation, use alternative
+            omiseSourceType = 'bill_payment_tesco_lotus';
             break;
           case PaymentMethod.INTERNET_BANKING_SCB:
-            omiseSourceType = 'internet_banking_scb';
+            // Use mobile banking instead of internet banking
+            omiseSourceType = 'mobile_banking_scb';
             break;
           case PaymentMethod.INTERNET_BANKING_BAY:
+            // Use supported internet banking type
             omiseSourceType = 'internet_banking_bay';
             break;
           case PaymentMethod.INTERNET_BANKING_BBL:
+            // Use supported internet banking type
             omiseSourceType = 'internet_banking_bbl';
             break;
           case PaymentMethod.INTERNET_BANKING_KBANK:
-            omiseSourceType = 'internet_banking_kbank';
+            // Use mobile banking instead of internet banking
+            omiseSourceType = 'mobile_banking_kbank';
             break;
           case PaymentMethod.INTERNET_BANKING_KTB:
-            omiseSourceType = 'internet_banking_ktb';
+            // Use mobile banking instead of internet banking
+            omiseSourceType = 'mobile_banking_ktb';
             break;
           case PaymentMethod.BANK_TRANSFER:
             // For bank transfer, we'll create a special handling
@@ -198,20 +217,44 @@ export class PaymentsService {
 
       if (!isMockMode && payment_method !== PaymentMethod.CARD) {
         // Create source for non-card payments (REAL OMISE)
-        const source = await this.omiseClient.sources.create({
-          amount: omiseAmount,
-          currency: omiseCurrency,
-          type: omiseSourceType,
-        });
-        omiseSourceId = source.id;
-        charge = await this.omiseClient.charges.create({
-          amount: omiseAmount,
-          currency: omiseCurrency,
-          source: omiseSourceId,
-          return_uri: process.env.FRONTEND_URL,
-          description: omiseDescription,
-          metadata: omiseMetadata,
-        });
+        try {
+          console.log('Creating Omise source:', { amount: omiseAmount, currency: omiseCurrency, type: omiseSourceType });
+          const source = await this.omiseClient.sources.create({
+            amount: omiseAmount,
+            currency: omiseCurrency,
+            type: omiseSourceType,
+          });
+          omiseSourceId = source.id;
+          console.log('✅ Created Omise source:', source.id);
+
+          console.log('Creating Omise charge:', { amount: omiseAmount, currency: omiseCurrency, source: omiseSourceId });
+          charge = await this.omiseClient.charges.create({
+            amount: omiseAmount,
+            currency: omiseCurrency,
+            source: omiseSourceId,
+            return_uri: process.env.FRONTEND_URL,
+            description: omiseDescription,
+            metadata: omiseMetadata,
+          });
+          console.log('Created Omise charge:', charge.id);
+        } catch (omiseError) {
+          console.error('❌ Omise source/charge creation failed:', omiseError);
+          this.loggerService.logPayment(
+            'error',
+            'Omise API Error during source/charge creation',
+            {
+              omiseError: JSON.stringify(omiseError), // Stringify the error object
+              amount: omiseAmount,
+              currency: omiseCurrency,
+              sourceType: omiseSourceType
+            },
+            null,
+            null,
+            'omise_source_creation_failed',
+            'failed',
+          );
+          throw new Error(`Omise API Error: ${omiseError.message || omiseError}`);
+        }
       }
 
       // Create payment record
@@ -274,16 +317,14 @@ export class PaymentsService {
 
       return response;
     } catch (error) {
-      await this.loggerService.logPayment(
-        'error',
-        'Failed to create payment',
-        { error: error.message, ...createPaymentDto },
-        null,
-        null,
-        'create_payment',
-        'failed',
-      );
-      throw error;
+      console.error('Payment creation error:', error);
+
+      // Create user-friendly error messages
+      const friendlyErrorDetails = ErrorMapper.toUserFacingError(error);
+      const friendlyError = new Error(friendlyErrorDetails.message);
+      (friendlyError as any).code = friendlyErrorDetails.code;
+      (friendlyError as any).originalError = friendlyErrorDetails.originalError;
+      throw friendlyError;
     }
   }
 

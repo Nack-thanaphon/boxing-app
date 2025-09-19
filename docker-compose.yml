@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend Service (Express.js) - DISABLED FOR TESTING
+  # Backend Service (Express.js) - DISABLED
   # backend:
   #   build:
   #     context: ./application/muay-thai-ticket-backend
@@ -71,8 +71,8 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: password
       DB_NAME: postgres
-      OMISE_PUBLIC_KEY: pkey_test_64u883evuqm272sxgil
-      OMISE_SECRET_KEY: skey_test_64z8829g9n0tva7hyfa
+      OMISE_PUBLIC_KEY: pkey_test_64zhy0wcqhxwhrzmu5p
+      OMISE_SECRET_KEY: skey_test_64zhy1dmzjsebwt13qm
       OMISE_WEBHOOK_SECRET: whsec_test_64z8829g9n0tva7hyfa
       FRONTEND_URL: http://localhost:3001
       BACKEND_URL: http://backend:3002
@@ -105,6 +105,7 @@ services:
       PORT: 3001
       NEXT_PUBLIC_BACKEND_URL: http://localhost:3002
       NEXT_PUBLIC_PAYMENT_SERVICE_URL: http://localhost:3000
+      NEXT_PUBLIC_OMISE_PUBLIC_KEY: pkey_test_64zgq9gczw0n9xcqvsq
     volumes:
       - ./application/boxing-fight-booking:/app
       - /app/node_modules
